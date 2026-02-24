@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: RSA-Cryptography-macOS.zip
+          - os: windows-latest
+            artifact: RSA-Cryptography-Windows.zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --windowed --name "RSA Cryptography" app.py
+          zip -r RSA-Cryptography-macOS.zip "dist/RSA Cryptography.app"
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --windowed --onefile --name "RSA Cryptography" app.py
+          Compress-Archive -Path "dist/RSA Cryptography.exe" -DestinationPath "RSA-Cryptography-Windows.zip"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}

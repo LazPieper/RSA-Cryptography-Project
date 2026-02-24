@@ -67,33 +67,57 @@ def eea(m, n):
         s2, t2 = s, t
     return m, (s1, t1)
 
-# using brute force primality test p and q since we're not yet dealing with larger numbers
-def is_prime(a):
-    if a >= 2:
-        for i in range(2, a):
-            if a % i == 0:
-                return False
+def miller_rabin_test(n, k=20):
+    # handle small cases directly
+    if n < 2:
+        return False
+    if n in (2, 3):
         return True
+    if n % 2 == 0:
+        return False
+    # write n-1 as 2^r * d with d odd
+    r, d = 0, n - 1
+    while d % 2 == 0:
+        r += 1
+        d //= 2
+    # test k random witnesses; more witnesses = lower false-positive probability
+    from random import randint
+    for _ in range(k):
+        a = randint(2, n - 2)
+        x = fme(a, d, n)
+        if x == 1 or x == n - 1:
+            continue
+        for _ in range(r - 1):
+            x = fme(x, 2, n)
+            if x == n - 1:
+                break
+        else:
+            return False
+    return True
 
 '''
-ascii defines printable values between 32-126, so n must be greater than 126 for our encryption to work in the encode() and decode() 
-functions, because if n is less than any of the ascii values for a letter (as it will be converted in convert_text() and convert_num() 
-functions) then the first FME modulo operation will reduce the value before encryption could happen, giving us a different ascii value. 
-But if n is greater than 126, then any integer between 32-126 mod n, would come out as the integer itself since it's smaller than n 
+ascii defines printable values between 32-126, so n must be greater than 126 for our encryption to work in the encode() and decode()
+functions, because if n is less than any of the ascii values for a letter (as it will be converted in convert_text() and convert_num()
+functions) then the first FME modulo operation will reduce the value before encryption could happen, giving us a different ascii value.
+But if n is greater than 126, then any integer between 32-126 mod n, would come out as the integer itself since it's smaller than n
 which would be accurately tied to the right ascii value
 '''
-def generate_prime():
-    # importing the random module and using its choice function to pick one random integer
-    from random import randint
-    # creating a loop that will generate a random integer and test its primality, and we'll exit the loop once we hit a prime number
+def generate_prime(bit_length=1024):
+    # bit_length controls the size of each prime; 1024 bits gives a 2048-bit RSA modulus (current standard)
+    # getrandbits generates a random number of exactly bit_length bits
+    from random import getrandbits
+    def random_prime_candidate(bits):
+        p = getrandbits(bits)
+        p |= (1 << (bits - 1))  # set the highest bit so it's exactly `bits` long
+        p |= 1                  # set the lowest bit so it's odd
+        return p
     while True:
-        # begin the range at 13 since 13 is the lowest prime number that both p and q can be to have a product over 126
-        p = randint(13, 100)
-        if is_prime(p):
+        p = random_prime_candidate(bit_length)
+        if miller_rabin_test(p):
             break
     while True:
-        q = randint(13, 100)
-        if is_prime(q):
+        q = random_prime_candidate(bit_length)
+        if miller_rabin_test(q):
             break
     return p, q
 
